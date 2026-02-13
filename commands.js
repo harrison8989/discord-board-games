@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { getRPSChoices } from './game.js';
-import { capitalize, InstallGlobalCommands } from './utils.js';
+import { capitalize, InstallGlobalCommands, InstallGuildCommands } from './utils.js';
 
 // Get the game choices from game.js
 function createCommandChoices() {
@@ -44,6 +44,18 @@ const CHALLENGE_COMMAND = {
   contexts: [0, 2],
 };
 
+const INCAN_GOLD_COMMAND = {
+  name: 'incan_gold',
+  description: 'Play a game of Incan Gold',
+  type: 1,
+  integration_types: [0, 1],
+  contexts: [0, 2],
+}
+
 const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND];
 
+// Register global commands
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
+
+// Register guild commands (uncomment and add your guild ID)
+// InstallGuildCommands(process.env.APP_ID, process.env.GUILD_ID, ALL_COMMANDS);
