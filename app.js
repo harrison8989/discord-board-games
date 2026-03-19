@@ -120,17 +120,41 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
 
     // "incan gold command"
     if (name === 'incan_gold') {
-      const players = await getExplicitPlayers(req.body);
-      const game = gameManager.createGame(id, IncanGoldGame, players);
-      const payload = game.getMessagePayload();
-
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      // Defer the response immediately to avoid the 3-second timeout
+      res.send({
+        type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
-          ...payload,
           flags: InteractionResponseFlags.IS_COMPONENTS_V2
-        },
+        }
       });
+
+      // Perform slow operations asynchronously
+      try {
+        const players = await getExplicitPlayers(req.body);
+        const game = gameManager.createGame(id, IncanGoldGame, players);
+        const payload = game.getMessagePayload();
+
+        // Update the original message with the game state
+        const endpoint = `webhooks/${process.env.APP_ID}/${req.body.token}/messages/@original`;
+        await DiscordRequest(endpoint, {
+          method: 'PATCH',
+          body: {
+            ...payload,
+            flags: InteractionResponseFlags.IS_COMPONENTS_V2
+          },
+        });
+      } catch (err) {
+        console.error('Error in incan_gold setup:', err);
+        // Update the original message with an error
+        const endpoint = `webhooks/${process.env.APP_ID}/${req.body.token}/messages/@original`;
+        await DiscordRequest(endpoint, {
+          method: 'PATCH',
+          body: {
+            content: `Failed to start Incan Gold: ${err.message}`,
+          },
+        }).catch(console.error);
+      }
+      return;
     }
 
     // "challenge" command
