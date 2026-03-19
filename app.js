@@ -75,6 +75,16 @@ async function getExplicitPlayers(interaction) {
 app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async function (req, res) {
   // Interaction id, type and data
   const { id, type, data, context } = req.body;
+  const user = req.body.member?.user || req.body.user;
+  const username = user ? user.username : 'Unknown';
+  
+  if (type === InteractionType.APPLICATION_COMMAND) {
+    console.log(`Interaction (Command): ${data.name} by ${username} (${user?.id})`);
+  } else if (type === InteractionType.MESSAGE_COMPONENT) {
+    console.log(`Interaction (Component): ${data.custom_id} by ${username} (${user?.id})`);
+  } else if (type !== InteractionType.PING) {
+    console.log(`Interaction (Type ${type}) by ${username} (${user?.id})`);
+  }
 
   /**
    * Handle verification requests
