@@ -123,6 +123,16 @@ export class IncanGoldGame extends BaseGame {
     const userId = interaction.member?.user?.id || interaction.user?.id;
     const player = this.playerStates.get(userId);
 
+    if (!player) {
+      return {
+        components: [{
+          type: MessageComponentTypes.TEXT_DISPLAY,
+          content: "❌ You are not a player in this game."
+        }],
+        flags: 64
+      };
+    }
+
     if (this.phase === GAME_PHASES.GAME_OVER) {
       return this.getMessagePayload();
     }
@@ -134,15 +144,6 @@ export class IncanGoldGame extends BaseGame {
       if (this.phase !== GAME_PHASES.ROUND_ENDED) {
         return this.getMessagePayload();
       }
-      if (!player) {
-        return {
-          components: [{
-            type: MessageComponentTypes.TEXT_DISPLAY,
-            content: "You are not in this game."
-          }],
-          flags: 64
-        };
-      }
       this.startNextRound();
       return this.getMessagePayload();
     }
@@ -152,17 +153,27 @@ export class IncanGoldGame extends BaseGame {
       return {
         components: [{
           type: MessageComponentTypes.TEXT_DISPLAY,
-          content: "The round has moved on."
+          content: "⏳ The round has already moved on."
         }],
         flags: 64
       };
     }
 
-    if (!player || !player.isInTemple) {
+    if (!player.isInTemple) {
       return {
         components: [{
           type: MessageComponentTypes.TEXT_DISPLAY,
-          content: "Sorry, you've already returned to camp for this round!"
+          content: "🏠 You have already returned to camp for this round. You'll join the expedition again in the next round!"
+        }],
+        flags: 64
+      };
+    }
+
+    if (player.decision !== null) {
+      return {
+        components: [{
+          type: MessageComponentTypes.TEXT_DISPLAY,
+          content: `✅ You have already decided to **${player.decision}** for this turn. Please wait for the other explorers!`
         }],
         flags: 64
       };
@@ -172,6 +183,9 @@ export class IncanGoldGame extends BaseGame {
       player.decision = DECISIONS.CONTINUE;
     } else if (customId.includes('leave')) {
       player.decision = DECISIONS.LEAVE;
+    } else {
+      // Not a decision button
+      return this.getMessagePayload();
     }
 
     // Check if everyone has decided
