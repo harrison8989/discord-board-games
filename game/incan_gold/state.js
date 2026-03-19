@@ -182,7 +182,7 @@ export class IncanGoldGame extends BaseGame {
       this.resolveDecisions();
     }
 
-    return this.getMessagePayload(userId);
+    return this.getMessagePayload();
   }
 
   resolveDecisions() {
@@ -223,7 +223,7 @@ export class IncanGoldGame extends BaseGame {
     }
   }
 
-  getMessagePayload(viewerId = null) {
+  getMessagePayload() {
     let content = `# 🏺 Incan Gold - Round ${this.currentRound}/5\n`;
     
     content += `## ${this.lastEvent}\n\n`;
@@ -291,9 +291,6 @@ export class IncanGoldGame extends BaseGame {
     }
 
     // Decision Buttons
-    const viewer = this.playerStates.get(viewerId);
-    const buttonsDisabled = !viewer || !viewer.isInTemple;
-
     const components = [
       textDisplay,
       {
@@ -304,16 +301,14 @@ export class IncanGoldGame extends BaseGame {
             custom_id: `incan_continue_${this.id}`,
             label: 'Keep Exploring',
             style: ButtonStyleTypes.PRIMARY,
-            emoji: { name: '🧗' },
-            disabled: buttonsDisabled
+            emoji: { name: '🧗' }
           },
           {
             type: MessageComponentTypes.BUTTON,
             custom_id: `incan_leave_${this.id}`,
             label: 'Return to Camp',
             style: ButtonStyleTypes.DANGER,
-            emoji: { name: '🚶' },
-            disabled: buttonsDisabled
+            emoji: { name: '🚶' }
           }
         ]
       }
