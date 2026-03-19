@@ -49,10 +49,10 @@ const INCAN_GOLD_COMMAND = {
   description: 'Play a game of Incan Gold',
   type: 1,
   integration_types: [0, 1],
-  contexts: [0, 2],
-}
+  contexts: [0, 1, 2],
+};
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND];
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND, INCAN_GOLD_COMMAND];
 
 // Register global commands
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);

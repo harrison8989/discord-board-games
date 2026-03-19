@@ -1,0 +1,81 @@
+Incan Gold (also known as Diamant) is the ultimate game of "push your luck." It’s a fast-paced journey into a Mayan temple where you have to decide: do I take my share and run, or risk it all for more?
+Here is everything you need to know to play.
+
+🏛️ The Objective
+The goal is simple: Collect the most turquoise, obsidian, and gold nuggets over five rounds (five different expeditions). The player with the highest total value at the end wins.
+
+💎 How to Play: The Expedition
+Each round follows a specific sequence of revealing cards and making decisions.
+1. Reveal a Card
+The leader (the Bot) turns over the top card of the deck.
+ * Treasure Cards: These show a number (e.g., 7, 11, 15). The value is divided equally among all players still in the temple. Leftovers (remainders) stay on the card on the path.
+ * Artifact Cards: These are special treasures worth big points (5 or 10) but only if exactly one player leaves the temple that turn.
+ * Hazard Cards: There are 5 types of hazards (Spiders, Snakes, Mummies, Rockfalls, and Fire).
+   * The first time a specific hazard appears, nothing happens—it’s just a warning.
+   * The second time the same hazard card appears, the round ends immediately.
+2. The Decision (The "Stay or Go" Moment)
+After a card is revealed and loot is shared, every player simultaneously decides whether to Continue or Leave.
+ * 🚶 Leave: 
+   * You move your character back to your camp.
+   * On your way out, you pick up all leftover gems sitting on the path cards.
+   * You bank all the gems you’ve collected this round into your "Tent" (they are now safe).
+   * You are out for the rest of the round.
+ * 🧗 Continue:
+   * You stay in the temple for the next card.
+   * You risk losing everything you’ve picked up this round if a duplicate hazard appears.
+
+🐍 Falling Victim to Hazards
+If a second hazard of the same type is revealed:
+ * The round ends immediately.
+ * Everyone still in the temple loses all gems they gathered during that round.
+ * That specific hazard card is removed from the game forever.
+
+🏆 Scoring
+* Turquoise: 1 point
+* Obsidian: 5 points
+* Gold: 10 points
+
+---
+
+### **Incan Gold Discord Bot Architecture (Node.js)**
+
+To support a modular design that can be extended to other games, we use a `GameManager` pattern.
+
+#### **1. Modular Design Strategy**
+*   **`GameManager.js`**: Orchestrates active game sessions. It maps Discord interaction IDs to specific game instances.
+*   **`BaseGame.js`**: An abstract class providing the interface for all games (e.g., `handleInteraction`, `getState`).
+*   **`IncanGold/` Directory**:
+    *   `constants.js`: Game-specific Enums (CARD_TYPES, PHASES).
+    *   `logic.js`: The core engine (deck shuffling, gem division, hazard tracking).
+    *   `state.js`: Per-session instance data.
+
+#### **2. Node.js Implementation Files**
+
+*   **`game/incan_gold/constants.js`**
+    *   `CardTypes`: `TREASURE`, `HAZARD`, `ARTIFACT`.
+    *   `Phases`: `DECISION`, `RESOLUTION`, `ROUND_END`, `GAME_END`.
+
+*   **`game/incan_gold/logic.js`**
+    *   `IncanGoldDeck`: Handles 15 Treasures, 15 Hazards (3x5 types), and 5 Artifacts.
+    *   `divideGems(total, playerCount)`: Returns share and remainder.
+
+*   **`game/incan_gold/state.js`**
+    *   `IncanGoldGame` (extends `BaseGame`):
+        *   `players`: Map of UserID -> Player stats.
+        *   `currentRound`: 1-5.
+        *   `revealedCards`: The path taken so far.
+        *   `isDone()`: Checks if all players have submitted their decision.
+
+#### **3. Discord Integration Flow**
+1.  **/incan_gold Command**:
+    *   The bot queries `GET /guilds/{guild_id}/members` to identify all potential players in the chat.
+    *   By default, it assumes everyone present wants to join.
+    *   Initializes a new `IncanGoldGame` instance.
+2.  **Simultaneous Decisions**:
+    *   The bot sends a message with two buttons: `🧗 Continue` and `🚶 Leave`.
+    *   As players click, the `GameManager` routes the interaction to the specific `IncanGoldGame` instance.
+    *   Once everyone has decided, the bot edits the message to reveal the next card and the updated path.
+
+#### **4. Setup and Extensibility**
+*   To add a new game (e.g., "Set"), create a new folder in `game/` and implement the `BaseGame` interface.
+*   Register the new game command in `commands.js` and link it in `GameManager.js`.
