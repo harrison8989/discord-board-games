@@ -162,7 +162,7 @@ export class IncanGoldGame extends BaseGame {
       return {
         components: [{
           type: MessageComponentTypes.TEXT_DISPLAY,
-          content: "You are not in the temple this round."
+          content: "Sorry, you've already returned to camp for this round!"
         }],
         flags: 64
       };
@@ -182,7 +182,7 @@ export class IncanGoldGame extends BaseGame {
       this.resolveDecisions();
     }
 
-    return this.getMessagePayload();
+    return this.getMessagePayload(userId);
   }
 
   resolveDecisions() {
@@ -223,7 +223,7 @@ export class IncanGoldGame extends BaseGame {
     }
   }
 
-  getMessagePayload() {
+  getMessagePayload(viewerId = null) {
     let content = `# 🏺 Incan Gold - Round ${this.currentRound}/5\n`;
     
     content += `## ${this.lastEvent}\n\n`;
@@ -291,6 +291,9 @@ export class IncanGoldGame extends BaseGame {
     }
 
     // Decision Buttons
+    const viewer = this.playerStates.get(viewerId);
+    const buttonsDisabled = !viewer || !viewer.isInTemple;
+
     const components = [
       textDisplay,
       {
@@ -301,14 +304,16 @@ export class IncanGoldGame extends BaseGame {
             custom_id: `incan_continue_${this.id}`,
             label: 'Keep Exploring',
             style: ButtonStyleTypes.PRIMARY,
-            emoji: { name: '🧗' }
+            emoji: { name: '🧗' },
+            disabled: buttonsDisabled
           },
           {
             type: MessageComponentTypes.BUTTON,
             custom_id: `incan_leave_${this.id}`,
             label: 'Return to Camp',
             style: ButtonStyleTypes.DANGER,
-            emoji: { name: '🚶' }
+            emoji: { name: '🚶' },
+            disabled: buttonsDisabled
           }
         ]
       }
