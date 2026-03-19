@@ -150,7 +150,13 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
         await DiscordRequest(endpoint, {
           method: 'PATCH',
           body: {
-            content: `Failed to start Incan Gold: ${err.message}`,
+            components: [
+              {
+                type: MessageComponentTypes.TEXT_DISPLAY,
+                content: `Failed to start Incan Gold: ${err.message}`,
+              }
+            ],
+            flags: InteractionResponseFlags.IS_COMPONENTS_V2
           },
         }).catch(console.error);
       }

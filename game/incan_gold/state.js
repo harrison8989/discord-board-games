@@ -105,7 +105,13 @@ export class IncanGoldGame extends BaseGame {
     const player = this.playerStates.get(userId);
 
     if (!player || !player.isInTemple || this.phase !== GAME_PHASES.WAITING_FOR_DECISIONS) {
-      return { content: "You are not in this game or the round has moved on.", flags: 64 };
+      return {
+        components: [{
+          type: MessageComponentTypes.TEXT_DISPLAY,
+          content: "You are not in this game or the round has moved on."
+        }],
+        flags: 64
+      };
     }
 
     const customId = interaction.data.custom_id;
@@ -172,50 +178,68 @@ export class IncanGoldGame extends BaseGame {
       content += `<@${p.id}>: ${p.roundGems} round / ${p.bankedGems} total [${status}]\n`;
     }
 
+    const textDisplay = {
+      type: MessageComponentTypes.TEXT_DISPLAY,
+      content
+    };
+
     if (this.phase === GAME_PHASES.GAME_OVER) {
-       content += `\n**GAME OVER!**\n`;
+       let gameOverContent = `\n**GAME OVER!**\n`;
        const sorted = Array.from(this.playerStates.values()).sort((a,b) => b.bankedGems - a.bankedGems);
-       content += `Winner: <@${sorted[0].id}> with ${sorted[0].bankedGems} gems!`;
-       return { content, components: [] };
+       gameOverContent += `Winner: <@${sorted[0].id}> with ${sorted[0].bankedGems} gems!`;
+       
+       return {
+         components: [
+           {
+             type: MessageComponentTypes.TEXT_DISPLAY,
+             content: content + gameOverContent
+           }
+         ]
+       };
     }
 
     if (this.phase === GAME_PHASES.ROUND_ENDED) {
         return {
-            content,
-            components: [{
-                type: MessageComponentTypes.ACTION_ROW,
-                components: [{
-                    type: MessageComponentTypes.BUTTON,
-                    custom_id: `incan_next_${this.id}`,
-                    label: 'Next Round',
-                    style: ButtonStyleTypes.SUCCESS
-                }]
-            }]
+            components: [
+                textDisplay,
+                {
+                    type: MessageComponentTypes.ACTION_ROW,
+                    components: [{
+                        type: MessageComponentTypes.BUTTON,
+                        custom_id: `incan_next_${this.id}`,
+                        label: 'Next Round',
+                        style: ButtonStyleTypes.SUCCESS
+                    }]
+                }
+            ]
         };
     }
 
     // Decision Buttons
-    const components = [{
-      type: MessageComponentTypes.ACTION_ROW,
-      components: [
-        {
-          type: MessageComponentTypes.BUTTON,
-          custom_id: `incan_continue_${this.id}`,
-          label: 'Continue',
-          style: ButtonStyleTypes.PRIMARY,
-          emoji: { name: '🧗' }
-        },
-        {
-          type: MessageComponentTypes.BUTTON,
-          custom_id: `incan_leave_${this.id}`,
-          label: 'Leave',
-          style: ButtonStyleTypes.DANGER,
-          emoji: { name: '🚶' }
-        }
-      ]
-    }];
+    const components = [
+      textDisplay,
+      {
+        type: MessageComponentTypes.ACTION_ROW,
+        components: [
+          {
+            type: MessageComponentTypes.BUTTON,
+            custom_id: `incan_continue_${this.id}`,
+            label: 'Continue',
+            style: ButtonStyleTypes.PRIMARY,
+            emoji: { name: '🧗' }
+          },
+          {
+            type: MessageComponentTypes.BUTTON,
+            custom_id: `incan_leave_${this.id}`,
+            label: 'Leave',
+            style: ButtonStyleTypes.DANGER,
+            emoji: { name: '🚶' }
+          }
+        ]
+      }
+    ];
 
-    return { content, components };
+    return { components };
   }
 
   formatCard(card) {
