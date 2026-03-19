@@ -47,6 +47,14 @@ const CHALLENGE_COMMAND = {
 const INCAN_GOLD_COMMAND = {
   name: 'incan_gold',
   description: 'Play a game of Incan Gold',
+  options: [
+    {
+      type: 3, // STRING
+      name: 'players',
+      description: 'List of players to include (mentions or usernames separated by space)',
+      required: true,
+    }
+  ],
   type: 1,
   integration_types: [0, 1],
   contexts: [0, 1, 2],

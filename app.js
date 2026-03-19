@@ -20,37 +20,49 @@ const PORT = process.env.PORT || 3000;
 // To keep track of our active games
 const activeGames = {};
 
-async function getPlayersInChat(interaction) {
-  const { context, guild_id, channel_id } = interaction;
-  let players = [];
+async function getExplicitPlayers(interaction) {
+  const { data, context, guild_id, channel_id } = interaction;
+  const playersStr = data.options.find(o => o.name === 'players')?.value || '';
+  const sender = interaction.member?.user || interaction.user;
+  let players = [{ id: sender.id, username: sender.username }]; // Initiator is always in
 
+  // Find mentions in the string (e.g., <@123>)
+  const mentions = playersStr.match(/<@!?(\d+)>/g) || [];
+  const mentionedIds = mentions.map(m => m.match(/\d+/)[0]);
+
+  // Fetch all potential candidates to resolve names/mentions
+  let candidates = [];
   try {
     if (context === 0) { // Guild
       const res = await DiscordRequest(`guilds/${guild_id}/members?limit=100`, { method: 'GET' });
       const members = await res.json();
-      players = members
-        .filter(m => !m.user.bot)
-        .map(m => ({ id: m.user.id, username: m.user.username }));
-    } else if (context === 1) { // Bot DM
-      const user = interaction.user;
-      players = [{ id: user.id, username: user.username }];
-    } else if (context === 2) { // Private Channel / GDM
+      candidates = members.map(m => ({ id: m.user.id, username: m.user.username }));
+    } else if (context === 2) { // GDM
       const res = await DiscordRequest(`channels/${channel_id}`, { method: 'GET' });
       const channel = await res.json();
       if (channel.recipients) {
-        players = channel.recipients.map(u => ({ id: u.id, username: u.username }));
-      }
-      // Add the sender as well just in case they aren't in recipients list for some reason
-      const sender = interaction.user;
-      if (!players.find(p => p.id === sender.id)) {
-        players.push({ id: sender.id, username: sender.username });
+        candidates = channel.recipients.map(u => ({ id: u.id, username: u.username }));
       }
     }
   } catch (err) {
-    console.error('Error fetching players:', err);
-    // Fallback to just the sender
-    const user = interaction.member?.user || interaction.user;
-    players = [{ id: user.id, username: user.username }];
+    console.error('Error fetching candidates:', err);
+  }
+
+  // Resolve Mention IDs
+  for (const id of mentionedIds) {
+    const user = candidates.find(c => c.id === id);
+    if (user && !players.find(p => p.id === user.id)) {
+      players.push(user);
+    }
+  }
+
+  // Resolve Usernames from names provided (naive space-separation)
+  const names = playersStr.replace(/<@!?\d+>/g, ' ').split(/\s+/).filter(n => n.length > 0);
+  for (const name of names) {
+    const user = candidates.find(c => c.username.toLowerCase() === name.toLowerCase());
+    if (user && !players.find(p => p.id === user.id)) {
+      players.push(user);
+    }
   }
 
   return players;
@@ -98,7 +110,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
 
     // "incan gold command"
     if (name === 'incan_gold') {
-      const players = await getPlayersInChat(req.body);
+      const players = await getExplicitPlayers(req.body);
       const game = gameManager.createGame(id, IncanGoldGame, players);
       const payload = game.getMessagePayload();
 
