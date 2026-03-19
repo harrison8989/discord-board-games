@@ -217,26 +217,36 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
         if (componentId.startsWith('incan_')) {
             const parts = componentId.split('_');
             const gameId = parts[parts.length - 1];
-            const game = gameManager.getGame(gameId);
             
-            if (game) {
-                if (componentId.startsWith('incan_next_')) {
-                    game.startNextRound();
-                }
-                const payload = game.handleInteraction(req.body);
-                
+            const payload = await gameManager.handleInteraction(gameId, req.body);
+            
+            if (payload) {
                 // If it's a "You are not in this game" message, it returns an ephemeral response
                 if (payload.flags === 64) {
                     return res.send({
                         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                        data: payload
+                        data: {
+                          ...payload,
+                          flags: payload.flags | InteractionResponseFlags.IS_COMPONENTS_V2
+                        }
                     });
                 }
 
                 // Otherwise, update the original message
                 return res.send({
                     type: InteractionResponseType.UPDATE_MESSAGE,
-                    data: payload
+                    data: {
+                      ...payload,
+                      flags: InteractionResponseFlags.IS_COMPONENTS_V2
+                    }
+                });
+            } else {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: {
+                        content: 'Game session not found. It may have expired or the bot may have restarted.',
+                        flags: InteractionResponseFlags.EPHEMERAL | InteractionResponseFlags.IS_COMPONENTS_V2
+                    }
                 });
             }
         }
@@ -247,7 +257,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
             // Delete message with token in request body
             const endpoint = `webhooks/${process.env.APP_ID}/${req.body.token}/messages/${req.body.message.id}`;
             try {
-                await res.send({
+                res.send({
                     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                     data: {
                         // Indicates it'll be an ephemeral message
@@ -276,6 +286,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
             } catch (err) {
                 console.error('Error sending message:', err);
             }
+            return;
         } else if (componentId.startsWith('select_choice_')) {
             // get the associated game ID
             const gameId = componentId.replace('select_choice_', '');
@@ -300,7 +311,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
 
                 try {
                     // Send results
-                    await res.send({
+                    res.send({
                         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                         data: {
                             flags: InteractionResponseFlags.IS_COMPONENTS_V2,
@@ -322,15 +333,32 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
                                     content: 'Nice choice ' + getRandomEmoji()
                                 }
                             ],
+                            flags: InteractionResponseFlags.IS_COMPONENTS_V2
                         },
                     });
                 } catch (err) {
                     console.error('Error sending message:', err);
                 }
+                return;
+            } else {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: {
+                        content: 'Challenge expired or not found.',
+                        flags: InteractionResponseFlags.EPHEMERAL | InteractionResponseFlags.IS_COMPONENTS_V2
+                    }
+                });
             }
         }
 
-        return;
+        // Catch-all for unhandled components
+        return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+                content: 'Unknown interaction.',
+                flags: InteractionResponseFlags.EPHEMERAL | InteractionResponseFlags.IS_COMPONENTS_V2
+            }
+        });
   }
 
   console.error('unknown interaction type', type);

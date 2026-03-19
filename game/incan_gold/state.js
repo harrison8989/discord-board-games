@@ -59,6 +59,10 @@ export class IncanGoldGame extends BaseGame {
 
   revealNextCard() {
     const card = this.currentDeck.shift();
+    if (!card) {
+      this.endRound(false);
+      return;
+    }
     this.revealedCards.push(card);
 
     if (card.type === CARD_TYPES.TREASURE) {
@@ -97,24 +101,63 @@ export class IncanGoldGame extends BaseGame {
       if (index !== -1) this.deck.splice(index, 1);
     }
     
-    this.phase = GAME_PHASES.ROUND_ENDED;
+    if (this.currentRound >= 5) {
+      this.phase = GAME_PHASES.GAME_OVER;
+      this.status = 'finished';
+    } else {
+      this.phase = GAME_PHASES.ROUND_ENDED;
+    }
   }
 
   handleInteraction(interaction) {
     const userId = interaction.member?.user?.id || interaction.user?.id;
     const player = this.playerStates.get(userId);
 
-    if (!player || !player.isInTemple || this.phase !== GAME_PHASES.WAITING_FOR_DECISIONS) {
+    if (this.phase === GAME_PHASES.GAME_OVER) {
+      return this.getMessagePayload();
+    }
+
+    const customId = interaction.data.custom_id;
+
+    // Handle Next Round button
+    if (customId.includes('next')) {
+      if (this.phase !== GAME_PHASES.ROUND_ENDED) {
+        return this.getMessagePayload();
+      }
+      if (!player) {
+        return {
+          components: [{
+            type: MessageComponentTypes.TEXT_DISPLAY,
+            content: "You are not in this game."
+          }],
+          flags: 64
+        };
+      }
+      this.startNextRound();
+      return this.getMessagePayload();
+    }
+
+    // Handle decisions
+    if (this.phase !== GAME_PHASES.WAITING_FOR_DECISIONS) {
       return {
         components: [{
           type: MessageComponentTypes.TEXT_DISPLAY,
-          content: "You are not in this game or the round has moved on."
+          content: "The round has moved on."
         }],
         flags: 64
       };
     }
 
-    const customId = interaction.data.custom_id;
+    if (!player || !player.isInTemple) {
+      return {
+        components: [{
+          type: MessageComponentTypes.TEXT_DISPLAY,
+          content: "You are not in the temple this round."
+        }],
+        flags: 64
+      };
+    }
+
     if (customId.includes('continue')) {
       player.decision = DECISIONS.CONTINUE;
     } else if (customId.includes('leave')) {
