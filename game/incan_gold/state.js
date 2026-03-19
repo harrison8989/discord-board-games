@@ -28,6 +28,7 @@ export class IncanGoldGame extends BaseGame {
       artifacts: 0
     }]));
     this.phase = GAME_PHASES.WAITING_FOR_DECISIONS;
+    this.lastEvent = '';
     this.startNextRound();
   }
 
@@ -53,6 +54,8 @@ export class IncanGoldGame extends BaseGame {
     this.roundHazards = new Set();
     this.pathGems = 0;
     
+    this.lastEvent = `🚨 **ROUND ${this.currentRound} START!** 🚨\n*The expedition enters a new part of the temple...*`;
+    
     // Draw first card immediately
     this.revealNextCard();
   }
@@ -70,13 +73,18 @@ export class IncanGoldGame extends BaseGame {
       const { share, remainder } = divideGems(card.value, activePlayers.length);
       activePlayers.forEach(p => p.roundGems += share);
       this.pathGems += remainder;
+      this.lastEvent = `💎 **Treasure!** Revealed: ${this.formatCard(card)}\n*Each explorer gets ${share} gems. ${remainder} left on the path.*`;
     } else if (card.type === CARD_TYPES.HAZARD) {
       if (this.roundHazards.has(card.hazardType)) {
         // Round ends in failure
+        this.lastEvent = `💀 **TRAP ACTIVATED!** Another ${card.hazardType} appeared!\n*Everyone still in the temple flees in terror, losing their round gems!*`;
         this.endRound(true, card.hazardType);
         return;
       }
       this.roundHazards.add(card.hazardType);
+      this.lastEvent = `⚠️ **Danger!** A ${card.hazardType} was spotted. One more of these and it's over!`;
+    } else if (card.type === CARD_TYPES.ARTIFACT) {
+      this.lastEvent = `✨ **Artifact Found!** A ${this.formatCard(card)} lies on the path.\n*Only someone leaving ALONE can claim it.*`;
     }
     // Artifacts stay on path until someone leaves alone
 
@@ -99,6 +107,8 @@ export class IncanGoldGame extends BaseGame {
       // Remove one instance of the triggering hazard from the deck permanently
       const index = this.deck.findIndex(c => c.type === CARD_TYPES.HAZARD && c.hazardType === hazardType);
       if (index !== -1) this.deck.splice(index, 1);
+    } else {
+      this.lastEvent = `⛺ **Round Over.** All explorers have returned to camp.`;
     }
     
     if (this.currentRound >= 5) {
@@ -183,6 +193,8 @@ export class IncanGoldGame extends BaseGame {
     // Leaving players split path gems
     if (leavingPlayers.length > 0) {
       const { share, remainder } = divideGems(this.pathGems, leavingPlayers.length);
+      let leavingMsg = `🚶 **${leavingPlayers.length} explorer(s) left the temple.**`;
+      
       leavingPlayers.forEach(p => {
         p.bankedGems += p.roundGems + share;
         p.roundGems = 0;
@@ -193,11 +205,15 @@ export class IncanGoldGame extends BaseGame {
       // Special Artifact rule: only if exactly one person leaves
       if (leavingPlayers.length === 1) {
         const artifactsOnPath = this.revealedCards.filter(c => c.type === CARD_TYPES.ARTIFACT && !c.claimed);
-        artifactsOnPath.forEach(a => {
-           leavingPlayers[0].bankedGems += a.value;
-           a.claimed = true;
-        });
+        if (artifactsOnPath.length > 0) {
+          artifactsOnPath.forEach(a => {
+            leavingPlayers[0].bankedGems += a.value;
+            a.claimed = true;
+          });
+          leavingMsg += ` They also claimed ${artifactsOnPath.length} artifact(s)!`;
+        }
       }
+      this.lastEvent = leavingMsg;
     }
 
     if (stayingPlayers.length === 0) {
@@ -208,17 +224,27 @@ export class IncanGoldGame extends BaseGame {
   }
 
   getMessagePayload() {
-    let content = `### Incan Gold - Round ${this.currentRound}/5\n`;
+    let content = `# 🏺 Incan Gold - Round ${this.currentRound}/5\n`;
     
+    content += `## ${this.lastEvent}\n\n`;
+
     // Show path
-    content += `Path: ${this.revealedCards.map(c => this.formatCard(c)).join(' ')}\n`;
-    content += `Gems on Path: 💎 ${this.pathGems}\n\n`;
+    const pathIcons = this.revealedCards.map((c, i) => {
+      const formatted = this.formatCard(c);
+      return (i === this.revealedCards.length - 1) ? `➡️ **${formatted}**` : formatted;
+    });
+    content += `**Path:** ${pathIcons.join(' ')}\n`;
+    content += `**Gems on Path:** 💎 ${this.pathGems}\n\n`;
 
     // Show players
-    content += `**Players:**\n`;
+    content += `**Status of Explorers:**\n`;
     for (let p of this.playerStates.values()) {
-      const status = p.isInTemple ? (p.decision ? '✅ Ready' : '⏳ Thinking...') : '⛺ At Camp';
-      content += `<@${p.id}>: ${p.roundGems} round / ${p.bankedGems} total [${status}]\n`;
+      const status = p.isInTemple ? (p.decision ? '✅ Ready' : '⏳ Deciding...') : '⛺ Safe at Camp';
+      content += `> <@${p.id}>: **${p.roundGems}** round / **${p.bankedGems}** total [${status}]\n`;
+    }
+
+    if (this.phase === GAME_PHASES.WAITING_FOR_DECISIONS) {
+      content += `\n**What will you do?** Continue deeper into the temple, or leave with your current gems?`;
     }
 
     const textDisplay = {
@@ -227,9 +253,14 @@ export class IncanGoldGame extends BaseGame {
     };
 
     if (this.phase === GAME_PHASES.GAME_OVER) {
-       let gameOverContent = `\n**GAME OVER!**\n`;
+       let gameOverContent = `\n# 🏆 GAME OVER! 🏆\n`;
        const sorted = Array.from(this.playerStates.values()).sort((a,b) => b.bankedGems - a.bankedGems);
-       gameOverContent += `Winner: <@${sorted[0].id}> with ${sorted[0].bankedGems} gems!`;
+       gameOverContent += `**The Winner is <@${sorted[0].id}> with ${sorted[0].bankedGems} gems!**\n\n`;
+       
+       gameOverContent += `**Final Scores:**\n`;
+       sorted.forEach((p, i) => {
+         gameOverContent += `${i+1}. <@${p.id}>: ${p.bankedGems} gems\n`;
+       });
        
        return {
          components: [
@@ -250,8 +281,9 @@ export class IncanGoldGame extends BaseGame {
                     components: [{
                         type: MessageComponentTypes.BUTTON,
                         custom_id: `incan_next_${this.id}`,
-                        label: 'Next Round',
-                        style: ButtonStyleTypes.SUCCESS
+                        label: 'Proceed to Next Round',
+                        style: ButtonStyleTypes.SUCCESS,
+                        emoji: { name: '🏹' }
                     }]
                 }
             ]
@@ -267,14 +299,14 @@ export class IncanGoldGame extends BaseGame {
           {
             type: MessageComponentTypes.BUTTON,
             custom_id: `incan_continue_${this.id}`,
-            label: 'Continue',
+            label: 'Keep Exploring',
             style: ButtonStyleTypes.PRIMARY,
             emoji: { name: '🧗' }
           },
           {
             type: MessageComponentTypes.BUTTON,
             custom_id: `incan_leave_${this.id}`,
-            label: 'Leave',
+            label: 'Return to Camp',
             style: ButtonStyleTypes.DANGER,
             emoji: { name: '🚶' }
           }
